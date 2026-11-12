@@ -1,44 +1,53 @@
-"""Pipeline abstraction for chaining transformers and estimators.
-Provides Transformer and Estimator base classes, and a Pipeline class.
+"""Pipeline module for NumCompute framework.
+Chains a sequence of data transformers and a final estimator, supporting incremental learning via .partial_fit() alongside standard fitting.
 """
+
 import numpy as np
 
 __all__ = ["Transformer", "Estimator", "Pipeline"]
 
-    
 class Transformer:
     """Base class for all the transformers in the NumCompute framework."""
     
     def fit(self, X, y=None):
-        """Fit transformer to data"""
+        """Fit transformer to data."""
         return self
+
+    def partial_fit(self, X, y=None):
+        """Incrementally fit transformer to data chunk."""
+        return self.fit(X, y)
 
     def transform(self, X):
         """Transform data."""
         raise NotImplementedError
 
     def fit_transform(self, X, y=None):
-            """Fit to data then transform it."""
-            return self.fit(X,y).transform(X)
+        """Fit to data then transform it."""
+        return self.fit(X, y).transform(X)
     
 class Estimator:
     """Base class for all the estimators in the NumCompute framework."""
     
     def fit(self, X, y=None):
-        """Fit transformer to data"""
+        """Fit estimator to data."""
         return self
+
+    def partial_fit(self, X, y=None):
+        """Incrementally fit estimator to data chunk."""
+        return self.fit(X, y)
     
     def predict(self, X):
         """Make predictions."""
         raise NotImplementedError
     
 class Pipeline:
-    """Pipeline sequence of data tranformers with a final estimator.
+    """Pipeline sequence of data transformers with a final estimator.
+    Supports both batch and incremental streaming via .partial_fit().
     ______
     Complexity:
-        *Fit/Transform : 
-            -Time:O(sum of steps time)
-            -Space:O(memory of largest step)
+        *Fit / Transform / Partial_Fit : 
+            - Time: O(sum of steps time)
+            - Space: O(memory of largest step)
     """
     
     def __init__(self, steps):
@@ -46,8 +55,29 @@ class Pipeline:
             raise TypeError("Steps must be a list of (name, transform) tuples.")
         self.steps = steps
         
+    def partial_fit(self, X, y=None):
+        """Incrementally fit all intermediate transformers using partial_fit and transform,
+        then call partial_fit on the final estimator.
+        """
+        Xt = X
+        for name, step in self.steps[:-1]:
+            if hasattr(step, "partial_fit"):
+                Xt = step.partial_fit(Xt, y).transform(Xt)
+            elif hasattr(step, "fit_transform"):
+                Xt = step.fit_transform(Xt, y)
+            else:
+                Xt = step.fit(Xt, y).transform(Xt)
+        
+        if self.steps:
+            name, step = self.steps[-1]
+            if hasattr(step, "partial_fit"):
+                step.partial_fit(Xt, y)
+            elif hasattr(step, "fit"):
+                step.fit(Xt, y)
+        return self
+        
     def fit(self, X, y=None):
-        """Fit all transformers."""
+        """Fit all transformers and the final estimator."""
         Xt = X
         for name, step in self.steps[:-1]:
             if hasattr(step, "fit_transform"):
@@ -61,7 +91,7 @@ class Pipeline:
         return self
     
     def transform(self, X, y=None):
-        """Fit all steps and transform data."""
+        """Transform data through all steps."""
         Xt = X
         for name, step in self.steps:
             if hasattr(step, "transform"):
