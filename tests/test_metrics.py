@@ -8,6 +8,8 @@ from numcompute_stream.metrics import (
     mse,
     precision,
     recall,
+    StreamingAccuracy,
+    StreamingMSE
 )
 
 
@@ -47,3 +49,29 @@ def test_metrics_empty_inputs():
 def test_metrics_all_predictions_equal():
     assert accuracy([1, 1, 1], [1, 1, 1]) == 1.0
     assert confusion_matrix([1, 1, 1], [1, 1, 1]).tolist() == [[3]]
+
+def test_streaming_accuracy():
+    """Test incremental streaming accuracy updates and state reset across chunks."""
+    metric = StreamingAccuracy()
+    metric.update([0, 1], [0, 0])
+    metric.update([1, 1], [1, 1])
+    assert metric.total_count == 4
+    assert metric.correct_count == 3
+    assert np.isclose(metric.get(), 0.75)
+    
+    metric.reset()
+    assert metric.total_count == 0
+    assert metric.get() == 0.0
+
+
+def test_streaming_mse():
+    """Test incremental streaming MSE updates and state reset across chunks."""
+    metric = StreamingMSE()
+    metric.update([1.0, 2.0], [1.0, 2.0])
+    metric.update([3.0, 4.0], [4.0, 3.0])
+    assert metric.total_count == 4
+    assert np.isclose(metric.get(), 0.5)
+    
+    metric.reset()
+    assert metric.total_count == 0
+    assert metric.get() == 0.0
