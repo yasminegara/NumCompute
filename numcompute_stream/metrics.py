@@ -1,4 +1,6 @@
-"""Simple classification and regression metrics."""
+"""Simple classification and regression metrics.
+Supports both batch computation and incremental updates for streaming via streaming classes.
+"""
 
 import numpy as np
 
@@ -9,6 +11,8 @@ __all__ = [
     "f1",
     "confusion_matrix",
     "mse",
+    "StreamingAccuracy",
+    "StreamingMSE",
 ]
 
 
@@ -173,3 +177,89 @@ def mse(y_true, y_pred):
     if true.size == 0:
         raise ValueError("cannot calculate MSE for empty data")
     return np.mean((true - pred) ** 2)
+
+
+class StreamingAccuracy:
+    """Accumulate and compute accuracy incrementally across data chunks.
+    """
+
+    def __init__(self):
+        """Initialize running counters for correct predictions and total samples.
+        """
+        self.correct_count = 0
+        self.total_count = 0
+
+    def update(self, y_true, y_pred):
+        """Update running counts with a new chunk of true and predicted labels.
+        ____________
+        Parameters:
+            y_true, y_pred : array_like, shape (n_samples,) -> chunk labels.
+        ------------
+        Returns :
+            self: object -> Updated streaming metric.
+        """
+        true, pred = _check_inputs(y_true, y_pred)
+        if true.size > 0:
+            self.correct_count += np.sum(true == pred)
+            self.total_count += true.size
+        return self
+
+    def get(self):
+        """Return the cumulative accuracy score.
+        ------------
+        Returns :
+            float -> Current accuracy.
+        """
+        if self.total_count == 0:
+            return 0.0
+        return self.correct_count / self.total_count
+
+    def reset(self):
+        """Reset internal accumulators.
+        """
+        self.correct_count = 0
+        self.total_count = 0
+        return self
+
+
+class StreamingMSE:
+    """Accumulate and compute mean squared error incrementally across data chunks.
+    """
+
+    def __init__(self):
+        """Initialize running accumulators for squared error sum and total samples.
+        """
+        self.sum_squared_error = 0.0
+        self.total_count = 0
+
+    def update(self, y_true, y_pred):
+        """Update running error sum with a new chunk of values.
+        ____________
+        Parameters:
+            y_true, y_pred : array_like, shape (n_samples,) -> chunk numeric values.
+        ------------
+        Returns :
+            self: object -> Updated streaming metric.
+        """
+        true, pred = _check_inputs(y_true, y_pred)
+        if true.size > 0:
+            self.sum_squared_error += np.sum((true - pred) ** 2)
+            self.total_count += true.size
+        return self
+
+    def get(self):
+        """Return the cumulative mean squared error.
+        ------------
+        Returns :
+            float -> Current MSE.
+        """
+        if self.total_count == 0:
+            return 0.0
+        return self.sum_squared_error / self.total_count
+
+    def reset(self):
+        """Reset internal accumulators.
+        """
+        self.sum_squared_error = 0.0
+        self.total_count = 0
+        return self
