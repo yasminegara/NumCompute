@@ -1,3 +1,7 @@
+"""NumCompute framework initialization module.
+Exposes core modules, estimators, preprocessors, pipelines, metrics, and stream evaluators.
+"""
+
 from .io import *
 from .rank import *
 from .sort_search import *
@@ -7,3 +11,6 @@ from .preprocessing import *
 from .metrics import *
 from .optim import *
 from .utils import *
+from .tree import *
+from .stream import *
+from .visualise import *
